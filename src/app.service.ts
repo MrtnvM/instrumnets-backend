@@ -21,7 +21,6 @@ export class AppService {
       fields: [
         'Код',
         'Наименование',
-        'Описание',
         'Характеристики',
         'Цена',
         'Название категорий',
@@ -35,21 +34,13 @@ export class AppService {
         const images = data['Фото товара'] || [];
         const categories = data['Название категорий'] || [];
 
-        const description = data['Описание'] || null;
-        const paramsText = data['Характеристики'] || null;
-        const params =
-          paramsText &&
-          paramsText.split('\n').map((param: string) => {
-            const [key, value] = param.split(':');
-            return key && value ? [key.trim(), value.trim()] : [key.trim()];
-          });
+        const description = data['Характеристики'] || '';
 
         const product: Product = {
           code: data['Код'],
           name: data['Наименование'],
           description,
           price: data['Цена'],
-          params,
           category: categories.length > 0 ? categories[0] : null,
           images: images.map((image: any) => image.url),
           thumbnail: images.length > 0 ? images[0].thumbnails.large.url : null,
