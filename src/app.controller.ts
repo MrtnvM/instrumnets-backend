@@ -1,5 +1,6 @@
-import { Controller, Get } from '@nestjs/common';
+import { Body, Controller, Get, Post } from '@nestjs/common';
 import { AppService } from './app.service';
+import { OrderDto } from './models/order.dto';
 
 @Controller()
 export class AppController {
@@ -8,5 +9,10 @@ export class AppController {
   @Get('products')
   getProducts() {
     return this.appService.getProducts();
+  }
+
+  @Post('order/create')
+  createOrder(@Body() order: OrderDto) {
+    return this.appService.createOrder(order);
   }
 }

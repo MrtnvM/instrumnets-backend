@@ -1,32 +1,28 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import Airtable from 'airtable';
 import { Product } from './models/product';
+import { OrderDto } from './models/order.dto';
+import { DB } from './data/airtable-db';
+import { nanoid } from 'nanoid';
 
 @Injectable()
 export class AppService {
   constructor(private configService: ConfigService) {}
 
   async getProducts() {
-    const airtable = new Airtable({
-      apiKey: this.configService.get('AIRTABLE_TOKEN'),
-    });
-
-    const InstrumentsBase = airtable.base('appSYC2LG829A0Amj');
-    const InstrumentsTable = InstrumentsBase('Товары');
-    // const CategoriesTable = InstrumentsBase('Категории')
-
-    const instruments = await InstrumentsTable.select({
-      view: 'Site',
-      fields: [
-        'Код',
-        'Наименование',
-        'Характеристики',
-        'Цена',
-        'Название категорий',
-        'Фото товара',
-      ],
-    }).all();
+    const instruments = await DB()
+      .ProductTable.select({
+        view: 'Site',
+        fields: [
+          'Код',
+          'Наименование',
+          'Характеристики',
+          'Цена',
+          'Название категорий',
+          'Фото товара',
+        ],
+      })
+      .all();
 
     const instrumentsData = instruments
       .map((instrument: any) => {
@@ -71,5 +67,77 @@ export class AppService {
     console.log(groupedInstruments);
 
     return groupedInstruments;
+  }
+
+  async createOrder(order: OrderDto) {
+    try {
+      const productsRecords = await DB()
+        .ProductTable.select({
+          view: 'Site',
+        })
+        .all();
+
+      const productMap = productsRecords.reduce((acc, record) => {
+        const code = record.get('Код') as string;
+        acc[code] = record;
+        return acc;
+      }, {});
+
+      const orderRecord = await DB().OrderTable.create({
+        Имя: order.firstName,
+        Фамилия: order.lastName,
+        Телефон: order.phone,
+        Email: order.email,
+        Адрес: order.address,
+        Комментарий: order.comment,
+        Компания: order.company,
+        Город: order.city,
+        'Дата создания': new Date().toISOString(),
+      });
+
+      // Split order items into separate groups by 10 items
+      // because Airtable API has a limit of 10 items per request
+
+      const GROUP_SIZE = 10;
+      const orderItemsGroups = order.orderItems.reduce(
+        (acc, item) => {
+          const lastGroup = acc[acc.length - 1];
+
+          if (lastGroup.length < GROUP_SIZE) {
+            lastGroup.push(item);
+          } else {
+            acc.push([item]);
+          }
+
+          return acc;
+        },
+        [[]],
+      );
+
+      // Create order items in Airtable
+
+      for (const orderItemsGroup of orderItemsGroups) {
+        const orderItemsData = orderItemsGroup.map((item) => {
+          const productRecord = productMap[item.productCode];
+
+          return {
+            fields: {
+              Заказ: [orderRecord.getId()],
+              Товар: [productRecord.getId()],
+              Количество: item.count,
+            },
+          };
+        });
+
+        await DB().OrderItemsTable.create(orderItemsData);
+      }
+
+      return orderRecord.getId();
+    } catch (error) {
+      console.error(error);
+      throw new InternalServerErrorException({
+        message: 'Ошибка создания заказа',
+      });
+    }
   }
 }
