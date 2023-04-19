@@ -18,7 +18,6 @@ export class OrderDto {
   phone: string;
 
   @IsString()
-  @IsNotEmpty()
   comment: string;
 
   @IsString()
