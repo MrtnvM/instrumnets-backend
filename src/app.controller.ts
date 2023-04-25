@@ -8,7 +8,7 @@ export class AppController {
 
   @Get('products')
   getProducts() {
-    return this.appService.getProducts();
+    return this.appService.getCachedProducts();
   }
 
   @Post('order/create')

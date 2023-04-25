@@ -3,7 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { Product } from './models/product';
 import { OrderDto } from './models/order.dto';
 import { DB } from './data/airtable-db';
-import { nanoid } from 'nanoid';
+import { FirebaseDB } from './data/firebase-db';
+import { Cron, Timeout } from '@nestjs/schedule';
 
 @Injectable()
 export class AppService {
@@ -44,7 +45,10 @@ export class AppService {
 
         return product;
       })
-      .filter((instrument) => instrument.name && instrument.thumbnail);
+      .filter(
+        (instrument) =>
+          instrument.name && instrument.thumbnail && instrument.price,
+      );
 
     const groupedInstruments = instrumentsData.reduce((acc, instrument) => {
       const { category } = instrument;
@@ -64,9 +68,33 @@ export class AppService {
       return acc;
     }, []);
 
-    console.log(groupedInstruments);
-
     return groupedInstruments;
+  }
+
+  // @Timeout(100)
+  // async playground() {
+  //   const products = await this.getCachedProducts();
+  //   console.log(products);
+  // }
+
+  @Cron('0 */1 * * * *')
+  async updateProductsCache() {
+    const products = await this.getProducts();
+    await FirebaseDB().products.set(products);
+    console.log('Products cache updated');
+    return products;
+  }
+
+  async getCachedProducts() {
+    const cachedProductsSnaphot = await FirebaseDB().products.get();
+    const cachedProducts = cachedProductsSnaphot.val();
+
+    if (!cachedProducts) {
+      const newProducts = await this.updateProductsCache();
+      return newProducts;
+    }
+
+    return cachedProducts;
   }
 
   async createOrder(order: OrderDto) {
