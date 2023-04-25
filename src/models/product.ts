@@ -6,4 +6,5 @@ export type Product = {
   category: string;
   images: string[];
   thumbnail: string | null;
+  categoryOrder: number;
 };

@@ -21,6 +21,7 @@ export class AppService {
           'Цена',
           'Название категорий',
           'Фото товара',
+          'Порядок категории',
         ],
       })
       .all();
@@ -41,6 +42,7 @@ export class AppService {
           category: categories.length > 0 ? categories[0] : null,
           images: images.map((image: any) => image.url),
           thumbnail: images.length > 0 ? images[0].thumbnails.large.url : null,
+          categoryOrder: data['Порядок категории'] || 100,
         };
 
         return product;
@@ -50,8 +52,14 @@ export class AppService {
           instrument.name && instrument.thumbnail && instrument.price,
       );
 
-    const groupedInstruments = instrumentsData.reduce((acc, instrument) => {
-      const { category } = instrument;
+    const groupedInstruments = instrumentsData.reduce<
+      {
+        name: string;
+        instruments: Product[];
+        order: number;
+      }[]
+    >((acc, instrument) => {
+      const { category, categoryOrder } = instrument;
 
       let group = acc.find((group) => group.name === category);
 
@@ -59,6 +67,7 @@ export class AppService {
         group = {
           name: category,
           instruments: [],
+          order: categoryOrder,
         };
 
         acc.push(group);
@@ -67,6 +76,12 @@ export class AppService {
       group.instruments.push(instrument);
       return acc;
     }, []);
+
+    groupedInstruments.sort((a, b) => {
+      return a.order - b.order;
+    });
+
+    console.log(groupedInstruments);
 
     return groupedInstruments;
   }
@@ -88,6 +103,8 @@ export class AppService {
   async getCachedProducts() {
     const cachedProductsSnaphot = await FirebaseDB().products.get();
     const cachedProducts = cachedProductsSnaphot.val();
+
+    const pr;
 
     if (!cachedProducts) {
       const newProducts = await this.updateProductsCache();
