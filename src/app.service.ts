@@ -104,8 +104,6 @@ export class AppService {
     const cachedProductsSnaphot = await FirebaseDB().products.get();
     const cachedProducts = cachedProductsSnaphot.val();
 
-    const pr;
-
     if (!cachedProducts) {
       const newProducts = await this.updateProductsCache();
       return newProducts;
