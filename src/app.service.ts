@@ -4,7 +4,8 @@ import { Product } from './models/product';
 import { OrderDto } from './models/order.dto';
 import { DB } from './data/airtable-db';
 import { FirebaseDB } from './data/firebase-db';
-import { Cron, Timeout } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
+import { ProductCategory } from './models/product-category';
 
 @Injectable()
 export class AppService {
@@ -23,6 +24,7 @@ export class AppService {
           'Фото товара',
           'Порядок категории',
         ],
+        filterByFormula: '{Отображается} = 1',
       })
       .all();
 
@@ -42,7 +44,8 @@ export class AppService {
           category: categories.length > 0 ? categories[0] : null,
           images: images.map((image: any) => image.url),
           thumbnail: images.length > 0 ? images[0].thumbnails.large.url : null,
-          categoryOrder: data['Порядок категории'] || 100,
+          categoryOrder:
+            (data['Порядок категории'] && data['Порядок категории'][0]) || 100,
         };
 
         return product;
@@ -100,7 +103,7 @@ export class AppService {
     return products;
   }
 
-  async getCachedProducts() {
+  async getCachedProducts(): Promise<ProductCategory[]> {
     const cachedProductsSnaphot = await FirebaseDB().products.get();
     const cachedProducts = cachedProductsSnaphot.val();
 
@@ -127,6 +130,7 @@ export class AppService {
       }, {});
 
       const orderRecord = await DB().OrderTable.create({
+        'ID пользователя': order.userId,
         Имя: order.firstName,
         Фамилия: order.lastName,
         Телефон: order.phone,
@@ -168,6 +172,7 @@ export class AppService {
               Заказ: [orderRecord.getId()],
               Товар: [productRecord.getId()],
               Количество: item.count,
+              'Цена на момент заказа': productRecord.get('Цена'),
             },
           };
         });
@@ -182,5 +187,59 @@ export class AppService {
         message: 'Ошибка создания заказа',
       });
     }
+  }
+
+  async getOrders(userId: string) {
+    const cachedProducts = await this.getCachedProducts();
+    const productMap = cachedProducts.reduce((acc, category) => {
+      category.instruments.forEach((product) => {
+        acc[product.code] = product;
+      });
+      return acc;
+    }, {});
+
+    const orders = await DB()
+      .OrderTable.select({
+        view: 'Список заказов',
+        sort: [{ field: 'Дата создания', direction: 'desc' }],
+        filterByFormula: `{ID пользователя} = "${userId}"`,
+        fields: [
+          'ID',
+          'Адрес',
+          'Комментарий',
+          'Компания',
+          'Город',
+          'Дата создания',
+          'Статус',
+          'Коды товаров',
+          'Сумма заказа',
+        ],
+      })
+      .all();
+
+    const ordersData = orders.map((order: any) => {
+      const data = order.fields;
+
+      return {
+        id: data['ID'],
+        address: data['Адрес'],
+        comment: data['Комментарий'],
+        company: data['Компания'],
+        city: data['Город'],
+        status: data['Статус'],
+        createdAt: data['Дата создания'],
+        products: data['Коды товаров'].map((item: string) => {
+          const product = productMap[item];
+          return {
+            code: product.code,
+            name: product.name,
+            thumbnail: product.thumbnail,
+          };
+        }),
+        totalPrice: data['Сумма заказа'],
+      };
+    });
+
+    return ordersData;
   }
 }

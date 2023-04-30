@@ -11,6 +11,10 @@ import { OderItemDto } from './order-item.dto';
 export class OrderDto {
   @IsString()
   @IsNotEmpty()
+  userId: string;
+
+  @IsString()
+  @IsNotEmpty()
   company: string;
 
   @IsString()

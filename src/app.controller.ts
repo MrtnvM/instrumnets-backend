@@ -1,6 +1,8 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { AppService } from './app.service';
 import { OrderDto } from './models/order.dto';
+import { FirebaseAuthGuard } from './core/providers/firebase-auth.guard';
+import { FirebaseUserRequest } from './core/providers/firebase-user.request';
 
 @Controller()
 export class AppController {
@@ -14,5 +16,11 @@ export class AppController {
   @Post('order/create')
   createOrder(@Body() order: OrderDto) {
     return this.appService.createOrder(order);
+  }
+
+  @Get('orders')
+  @UseGuards(new FirebaseAuthGuard())
+  getOrders(@Req() request: FirebaseUserRequest) {
+    return this.appService.getOrders(request.profileId);
   }
 }
