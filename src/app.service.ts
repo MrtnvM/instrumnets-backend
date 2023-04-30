@@ -180,7 +180,7 @@ export class AppService {
         await DB().OrderItemsTable.create(orderItemsData);
       }
 
-      return orderRecord.getId();
+      return { success: true };
     } catch (error) {
       console.error(error);
       throw new InternalServerErrorException({
