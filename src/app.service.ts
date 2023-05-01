@@ -6,6 +6,7 @@ import { DB } from './data/airtable-db';
 import { FirebaseDB } from './data/firebase-db';
 import { Cron } from '@nestjs/schedule';
 import { ProductCategory } from './models/product-category';
+import { OrderProductData } from './models/order-product-data';
 
 @Injectable()
 export class AppService {
@@ -45,7 +46,7 @@ export class AppService {
           images: images.map((image: any) => image.url),
           thumbnail: images.length > 0 ? images[0].thumbnails.large.url : null,
           categoryOrder:
-            (data['Порядок категории'] && data['Порядок категории'][0]) || 100,
+            (data['Порядок категории'] && data['Порядок категории'][0]) || 1000,
         };
 
         return product;
@@ -213,12 +214,23 @@ export class AppService {
           'Статус',
           'Коды товаров',
           'Сумма заказа',
+          'Товар в заказе',
         ],
       })
       .all();
 
-    const ordersData = orders.map((order: any) => {
+    const ordersDataRequests = orders.map(async (order: any) => {
       const data = order.fields;
+      const orderID = data['ID'];
+
+      const orderProductsData = await this.getOrderProductsData(orderID);
+
+      const orderProductsMap: Record<string, OrderProductData> =
+        orderProductsData.reduce((acc, record) => {
+          const productCode = record.productCode;
+          acc[productCode] = record;
+          return acc;
+        }, {});
 
       return {
         id: data['ID'],
@@ -230,16 +242,47 @@ export class AppService {
         createdAt: data['Дата создания'],
         products: data['Коды товаров'].map((item: string) => {
           const product = productMap[item];
+
+          const count = orderProductsMap[item].count;
+          const price = orderProductsMap[item].price;
+
           return {
             code: product.code,
             name: product.name,
             thumbnail: product.thumbnail,
+            price,
+            count,
           };
         }),
         totalPrice: data['Сумма заказа'],
       };
     });
 
+    const ordersData = await Promise.all(ordersDataRequests);
+
     return ordersData;
+  }
+
+  private async getOrderProductsData(
+    orderId: string,
+  ): Promise<OrderProductData[]> {
+    const orderProductsData = await DB()
+      .OrderItemsTable.select({
+        view: 'База данных',
+        fields: ['Код товара', 'Количество', 'Цена на момент заказа'],
+        filterByFormula: `{ID заказа} = "${orderId}"`,
+      })
+      .all();
+
+    return orderProductsData.map((item) => {
+      const productCode = item.get('Код товара') as string;
+      const count = item.get('Количество') as number;
+      const price = item.get('Цена на момент заказа') as number;
+      return {
+        productCode,
+        count,
+        price,
+      };
+    });
   }
 }
