@@ -22,7 +22,9 @@ export class AdminController {
     @UploadedFile() file: Express.Multer.File,
   ): Promise<any[]> {
     const fileBuffer = file.buffer;
-    const parsedProducts = await this.priceParserService.parseXlsx(fileBuffer);
+    const parsedProducts = await this.priceParserService.updatePrices(
+      fileBuffer,
+    );
     return parsedProducts;
   }
 }

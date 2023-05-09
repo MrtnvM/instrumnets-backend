@@ -10,6 +10,13 @@ export const DB = () => {
   const CategoryTable = InstrumentsBase('Категории');
   const OrderTable = InstrumentsBase('Заказы');
   const OrderItemsTable = InstrumentsBase('Товары в заказе');
+  const PricesAndStockTable = InstrumentsBase('Цены и остатки');
 
-  return { ProductTable, CategoryTable, OrderTable, OrderItemsTable };
+  return {
+    ProductTable,
+    CategoryTable,
+    OrderTable,
+    OrderItemsTable,
+    PricesAndStockTable,
+  };
 };
