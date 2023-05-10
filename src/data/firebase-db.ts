@@ -5,5 +5,6 @@ export const FirebaseDB = () => {
 
   return {
     products: db.ref('products'),
+    clientCategories: db.ref('clientCategories'),
   };
 };

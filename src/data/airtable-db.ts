@@ -11,6 +11,7 @@ export const DB = () => {
   const OrderTable = InstrumentsBase('Заказы');
   const OrderItemsTable = InstrumentsBase('Товары в заказе');
   const PricesAndStockTable = InstrumentsBase('Цены и остатки');
+  const ClientCategoriesTable = InstrumentsBase('Категории клиентов');
 
   return {
     ProductTable,
@@ -18,5 +19,6 @@ export const DB = () => {
     OrderTable,
     OrderItemsTable,
     PricesAndStockTable,
+    ClientCategoriesTable,
   };
 };

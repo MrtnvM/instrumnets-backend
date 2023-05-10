@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { AppService } from './app.service';
 import { OrderDto } from './models/order.dto';
 import { FirebaseAuthGuard } from './core/providers/firebase-auth.guard';
@@ -9,8 +17,9 @@ export class AppController {
   constructor(private readonly appService: AppService) {}
 
   @Get('products')
-  getProducts() {
-    return this.appService.getCachedProducts();
+  getProducts(@Query('email') email: string) {
+    const clientEmail = email || null;
+    return this.appService.getCachedProducts(clientEmail);
   }
 
   @Post('order/create')

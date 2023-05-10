@@ -24,6 +24,12 @@ export class AppService {
           'Название категорий',
           'Фото товара',
           'Порядок категории',
+          'Количество',
+          'к',
+          'кб',
+          'о',
+          'н',
+          'ррц',
         ],
         filterByFormula: '{Отображается} = 1',
       })
@@ -41,19 +47,24 @@ export class AppService {
           code: data['Код'],
           name: data['Наименование'],
           description,
-          price: data['Цена'],
           category: categories.length > 0 ? categories[0] : null,
           images: images.map((image: any) => image.url),
           thumbnail: images.length > 0 ? images[0].thumbnails.large.url : null,
           categoryOrder:
             (data['Порядок категории'] && data['Порядок категории'][0]) || 1000,
+          kbPrice: data['кб'] && data['кб'][0],
+          kPrice: data['к'] && data['к'][0],
+          oPrice: data['о'] && data['о'][0],
+          nPrice: data['н'] && data['н'][0],
+          rrcPrice: data['ррц'] && data['ррц'][0],
+          count: (data['Количество'] && data['Количество'][0]) || 0,
         };
 
         return product;
       })
       .filter(
         (instrument) =>
-          instrument.name && instrument.thumbnail && instrument.price,
+          instrument.name && instrument.thumbnail && instrument.count > 0,
       );
 
     const groupedInstruments = instrumentsData.reduce<
@@ -85,8 +96,6 @@ export class AppService {
       return a.order - b.order;
     });
 
-    console.log(groupedInstruments);
-
     return groupedInstruments;
   }
 
@@ -96,6 +105,33 @@ export class AppService {
   //   console.log(products);
   // }
 
+  async getClientCategories() {
+    const clientCategories = await DB()
+      .ClientCategoriesTable.select({
+        view: 'База данных',
+        fields: ['Email', 'Категория'],
+      })
+      .all();
+
+    const clientCategoriesData = clientCategories.map((category: any) => {
+      const data = category.fields;
+      return {
+        email: data['Email'],
+        category: data['Категория'],
+      };
+    });
+
+    return clientCategoriesData;
+  }
+
+  @Cron('0 */1 * * * *')
+  async updateClientCategoriesCache() {
+    const clientCategories = await this.getClientCategories();
+    await FirebaseDB().clientCategories.set(clientCategories);
+    console.log('Client categories cache updated');
+    return clientCategories;
+  }
+
   @Cron('0 */1 * * * *')
   async updateProductsCache() {
     const products = await this.getProducts();
@@ -104,16 +140,63 @@ export class AppService {
     return products;
   }
 
-  async getCachedProducts(): Promise<ProductCategory[]> {
-    const cachedProductsSnaphot = await FirebaseDB().products.get();
-    const cachedProducts = cachedProductsSnaphot.val();
+  async getCachedClientCategories() {
+    const cachedClientCategoriesSnaphot =
+      await FirebaseDB().clientCategories.get();
+    const cachedClientCategories = cachedClientCategoriesSnaphot.val();
 
-    if (!cachedProducts) {
-      const newProducts = await this.updateProductsCache();
-      return newProducts;
+    if (!cachedClientCategories) {
+      const newClientCategories = await this.updateClientCategoriesCache();
+      return newClientCategories;
     }
 
-    return cachedProducts;
+    return cachedClientCategories;
+  }
+
+  async getCachedProducts(
+    clientEmail: string | null,
+  ): Promise<ProductCategory[]> {
+    let products: ProductCategory[] = [];
+
+    const cachedProductsSnaphot = await FirebaseDB().products.get();
+    products = cachedProductsSnaphot.val();
+
+    if (!products) {
+      products = await this.updateProductsCache();
+    }
+
+    const clientCategories = await this.getCachedClientCategories();
+    const clientCategory =
+      clientEmail &&
+      clientCategories.find((category) => category.email === clientEmail);
+
+    const priceField =
+      {
+        к: 'kPrice',
+        кб: 'kbPrice',
+        о: 'oPrice',
+        н: 'nPrice',
+        ррц: 'rrcPrice',
+      }[clientCategory?.category] || 'rrcPrice';
+
+    products.forEach((category) => {
+      category.instruments.forEach((instrument) => {
+        instrument.price = instrument[priceField];
+        delete instrument.kbPrice;
+        delete instrument.kPrice;
+        delete instrument.oPrice;
+        delete instrument.nPrice;
+        delete instrument.rrcPrice;
+      });
+    });
+
+    for (const category of products) {
+      category.instruments = category.instruments.filter(
+        (instrument) => instrument.price,
+      );
+    }
+
+    return products;
   }
 
   async createOrder(order: OrderDto) {
@@ -191,7 +274,7 @@ export class AppService {
   }
 
   async getOrders(userId: string) {
-    const cachedProducts = await this.getCachedProducts();
+    const cachedProducts = await this.getCachedProducts(null);
     const productMap = cachedProducts.reduce((acc, category) => {
       category.instruments.forEach((product) => {
         acc[product.code] = product;
