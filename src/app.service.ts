@@ -124,7 +124,7 @@ export class AppService {
     return clientCategoriesData;
   }
 
-  @Cron('0 */1 * * * *')
+  @Cron('*/15 * * * * *')
   async updateClientCategoriesCache() {
     const clientCategories = await this.getClientCategories();
     await FirebaseDB().clientCategories.set(clientCategories);
