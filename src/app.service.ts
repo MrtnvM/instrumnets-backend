@@ -7,6 +7,7 @@ import { FirebaseDB } from './data/firebase-db';
 import { Cron } from '@nestjs/schedule';
 import { ProductCategory } from './models/product-category';
 import { OrderProductData } from './models/order-product-data';
+import { ClientCatogory } from './models/client-category';
 
 @Injectable()
 export class AppService {
@@ -105,7 +106,7 @@ export class AppService {
   //   console.log(products);
   // }
 
-  async getClientCategories() {
+  async getClientCategories(): Promise<Record<string, ClientCatogory>> {
     const clientCategories = await DB()
       .ClientCategoriesTable.select({
         view: 'База данных',
@@ -121,7 +122,14 @@ export class AppService {
       };
     });
 
-    return clientCategoriesData;
+    return clientCategoriesData.reduce<Record<string, ClientCatogory>>(
+      (acc, category) => {
+        const encodedEmail = Buffer.from(category.email).toString('base64');
+        acc[encodedEmail] = category;
+        return acc;
+      },
+      {},
+    );
   }
 
   @Cron('*/15 * * * * *')
@@ -143,7 +151,8 @@ export class AppService {
   async getCachedClientCategories() {
     const cachedClientCategoriesSnaphot =
       await FirebaseDB().clientCategories.get();
-    const cachedClientCategories = cachedClientCategoriesSnaphot.val();
+    const cachedClientCategories: Record<string, ClientCatogory> =
+      cachedClientCategoriesSnaphot.val();
 
     if (!cachedClientCategories) {
       const newClientCategories = await this.updateClientCategoriesCache();
@@ -165,10 +174,7 @@ export class AppService {
       products = await this.updateProductsCache();
     }
 
-    const clientCategories = await this.getCachedClientCategories();
-    const clientCategory =
-      clientEmail &&
-      clientCategories.find((category) => category.email === clientEmail);
+    const clientCategory = await this.getClientCategory(clientEmail);
 
     const priceField =
       {
@@ -177,7 +183,7 @@ export class AppService {
         о: 'oPrice',
         н: 'nPrice',
         ррц: 'rrcPrice',
-      }[clientCategory?.category] || 'rrcPrice';
+      }[clientCategory] || 'rrcPrice';
 
     products.forEach((category) => {
       category.instruments.forEach((instrument) => {
@@ -199,8 +205,9 @@ export class AppService {
     return products;
   }
 
-  async createOrder(order: OrderDto) {
+  async createOrder(order: OrderDto, email: string) {
     try {
+      const clientCategory = await this.getClientCategory(email);
       const productsRecords = await DB()
         .ProductTable.select({
           view: 'Site',
@@ -250,13 +257,16 @@ export class AppService {
       for (const orderItemsGroup of orderItemsGroups) {
         const orderItemsData = orderItemsGroup.map((item) => {
           const productRecord = productMap[item.productCode];
+          const price =
+            productRecord.get(clientCategory) &&
+            productRecord.get(clientCategory)[0];
 
           return {
             fields: {
               Заказ: [orderRecord.getId()],
               Товар: [productRecord.getId()],
               Количество: item.count,
-              'Цена на момент заказа': productRecord.get('Цена'),
+              'Цена на момент заказа': price,
             },
           };
         });
@@ -323,7 +333,7 @@ export class AppService {
         city: data['Город'],
         status: data['Статус'],
         createdAt: data['Дата создания'],
-        products: data['Коды товаров'].map((item: string) => {
+        products: (data['Коды товаров'] || []).map((item: string) => {
           const product = productMap[item];
 
           const count = orderProductsMap[item].count;
@@ -367,5 +377,30 @@ export class AppService {
         price,
       };
     });
+  }
+
+  async getClientCategory(email: string | null) {
+    const defaultCategory = 'ррц';
+    if (!email) return defaultCategory;
+
+    const encodedEmail = Buffer.from(email).toString('base64');
+    const categorySnapshot = await FirebaseDB()
+      .clientCategories.child(encodedEmail)
+      .get();
+
+    const category = categorySnapshot.val();
+    return category?.category || defaultCategory;
+  }
+
+  async getClientProductMap(email: string) {
+    const cachedProducts = await this.getCachedProducts(email);
+    const productMap = cachedProducts.reduce((acc, category) => {
+      category.instruments.forEach((product) => {
+        acc[product.code] = product;
+      });
+      return acc;
+    }, {});
+
+    return productMap;
   }
 }

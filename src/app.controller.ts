@@ -23,8 +23,9 @@ export class AppController {
   }
 
   @Post('order/create')
-  createOrder(@Body() order: OrderDto) {
-    return this.appService.createOrder(order);
+  @UseGuards(new FirebaseAuthGuard())
+  createOrder(@Body() order: OrderDto, @Req() request: FirebaseUserRequest) {
+    return this.appService.createOrder(order, request.email);
   }
 
   @Get('orders')

@@ -5,7 +5,9 @@ export const DB = () => {
     apiKey: process.env.AIRTABLE_TOKEN,
   });
 
-  const InstrumentsBase = airtable.base('appSYC2LG829A0Amj');
+  const baseId = process.env.AIRTABLE_BASE_ID || 'appSYC2LG829A0Amj';
+  const InstrumentsBase = airtable.base(baseId);
+
   const ProductTable = InstrumentsBase('Товары');
   const CategoryTable = InstrumentsBase('Категории');
   const OrderTable = InstrumentsBase('Заказы');
