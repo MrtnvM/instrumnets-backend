@@ -5,6 +5,7 @@ import { AppService } from './app.service';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AdminModule } from './admin/admin.module';
 import { ApiKeyGuard } from './core/guards/api-key.guard';
+import { CategoriesModule } from './categories/categories.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { ApiKeyGuard } from './core/guards/api-key.guard';
     }),
     ScheduleModule.forRoot(),
     AdminModule,
+    CategoriesModule,
   ],
   controllers: [AppController],
   providers: [AppService, ApiKeyGuard],
