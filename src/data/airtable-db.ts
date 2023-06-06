@@ -14,9 +14,11 @@ export const DB = () => {
   const OrderItemsTable = InstrumentsBase('Товары в заказе');
   const PricesAndStockTable = InstrumentsBase('Цены и остатки');
   const ClientCategoriesTable = InstrumentsBase('Категории клиентов');
+  const ConsumablesTable = InstrumentsBase('Расходка');
 
   return {
     ProductTable,
+    ConsumablesTable,
     CategoryTable,
     OrderTable,
     OrderItemsTable,

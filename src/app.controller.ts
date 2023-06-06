@@ -22,6 +22,12 @@ export class AppController {
     return this.appService.getCachedProducts(clientEmail);
   }
 
+  @Get('v2/products')
+  getAllProducts(@Query('email') email: string) {
+    const clientEmail = email || null;
+    return this.appService.getCachedAllProducts(clientEmail);
+  }
+
   @Post('order/create')
   @UseGuards(new FirebaseAuthGuard())
   createOrder(@Body() order: OrderDto, @Req() request: FirebaseUserRequest) {

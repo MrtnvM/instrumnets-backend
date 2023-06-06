@@ -6,6 +6,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { AdminModule } from './admin/admin.module';
 import { ApiKeyGuard } from './core/guards/api-key.guard';
 import { CategoriesModule } from './categories/categories.module';
+import { ConsumablesService } from './consumables/consumables.service';
 
 @Module({
   imports: [
@@ -17,6 +18,6 @@ import { CategoriesModule } from './categories/categories.module';
     CategoriesModule,
   ],
   controllers: [AppController],
-  providers: [AppService, ApiKeyGuard],
+  providers: [AppService, ApiKeyGuard, ConsumablesService],
 })
 export class AppModule {}

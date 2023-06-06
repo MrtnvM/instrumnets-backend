@@ -8,10 +8,25 @@ import { Cron } from '@nestjs/schedule';
 import { ProductCategory } from './models/product-category';
 import { OrderProductData } from './models/order-product-data';
 import { ClientCatogory } from './models/client-category';
+import { ConsumablesService } from './consumables/consumables.service';
 
 @Injectable()
 export class AppService {
-  constructor(private configService: ConfigService) {}
+  constructor(
+    private configService: ConfigService,
+    private consumablesService: ConsumablesService,
+  ) {}
+
+  async getCachedAllProducts(clientEmail: string) {
+    const cachedProducts = await this.getCachedProducts(clientEmail);
+    const getCachedConsumables =
+      await this.consumablesService.getCachedConsumables();
+
+    return {
+      products: cachedProducts,
+      consumables: getCachedConsumables,
+    };
+  }
 
   async getProducts() {
     const instruments = await DB()
@@ -44,11 +59,18 @@ export class AppService {
 
         const description = data['Характеристики'] || '';
 
+        const category =
+          typeof categories === 'string'
+            ? categories
+            : categories.length > 0
+            ? categories[0]
+            : null;
+
         const product: Product = {
           code: data['Код'],
           name: data['Наименование'],
           description,
-          category: categories.length > 0 ? categories[0] : null,
+          category,
           images: images.map((image: any) => image.url),
           thumbnail: images.length > 0 ? images[0].thumbnails.large.url : null,
           categoryOrder:
