@@ -193,6 +193,7 @@ export class PriceParserService {
         kbPrice: row['Прайс КБ (р.)'],
         oPrice: row['Прайс О (р.)'],
         nPrice: row['Прайс Н (р.)'],
+        kPrice: row['Прайс К (р.)'],
         count: row['Кол-во'],
       };
 
