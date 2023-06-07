@@ -11,15 +11,19 @@ import { AppService } from './app.service';
 import { OrderDto } from './models/order.dto';
 import { FirebaseAuthGuard } from './core/providers/firebase-auth.guard';
 import { FirebaseUserRequest } from './core/providers/firebase-user.request';
+import { ProductsService } from './app-services/products.service';
 
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
+  constructor(
+    private readonly appService: AppService,
+    private productsService: ProductsService,
+  ) {}
 
   @Get('products')
   getProducts(@Query('email') email: string) {
     const clientEmail = email || null;
-    return this.appService.getCachedProducts(clientEmail);
+    return this.productsService.getCachedProducts(clientEmail);
   }
 
   @Get('v2/products')
