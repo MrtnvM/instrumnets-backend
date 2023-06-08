@@ -84,6 +84,37 @@ export class ConsumablesService {
     return groupedConsumableProducts;
   }
 
+  async getConsumableProductMapFromAirtable() {
+    const consumableProductsRecords = await DB()
+      .ProductTable.select({
+        view: 'Grid view',
+      })
+      .all();
+
+    const consumablesProductMap = consumableProductsRecords.reduce(
+      (acc, record) => {
+        const code = record.get('Артикул') as string;
+        acc[code] = record;
+        return acc;
+      },
+      {},
+    );
+
+    return consumablesProductMap;
+  }
+
+  async getCachedConsumableProductMap() {
+    const cachedProducts = await this.getCachedConsumables();
+    const productMap = cachedProducts.reduce((acc, category) => {
+      category.consumables.forEach((product) => {
+        acc[product.code] = product;
+      });
+      return acc;
+    }, {});
+
+    return productMap;
+  }
+
   @Cron('0 */1 * * * *')
   async updateConsumablesCache() {
     const products = await this.getConsumables();

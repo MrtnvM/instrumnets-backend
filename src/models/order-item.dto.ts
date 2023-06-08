@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsNumber, IsString } from 'class-validator';
+import { IsBoolean, IsNotEmpty, IsNumber, IsString } from 'class-validator';
 
 export class OderItemDto {
   @IsString()
@@ -8,4 +8,8 @@ export class OderItemDto {
   @IsNumber()
   @IsNotEmpty()
   count: number;
+
+  @IsBoolean()
+  @IsNotEmpty()
+  isConsumable: boolean;
 }

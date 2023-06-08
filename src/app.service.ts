@@ -6,6 +6,9 @@ import { OrderProductData } from './models/order-product-data';
 import { ConsumablesService } from './app-services/consumables.service';
 import { ProductsService } from './app-services/products.service';
 import { ClientCategoryService } from './app-services/client-category.service';
+import { OderItemDto as OrderItemDto } from './models/order-item.dto';
+import { ConsumableProduct } from './models/consumable-product';
+import { Product } from './models/product';
 
 @Injectable()
 export class AppService {
@@ -43,17 +46,10 @@ export class AppService {
       const clientCategory = await this.clientCategoryService.getClientCategory(
         email,
       );
-      const productsRecords = await DB()
-        .ProductTable.select({
-          view: 'Site',
-        })
-        .all();
 
-      const productMap = productsRecords.reduce((acc, record) => {
-        const code = record.get('Код') as string;
-        acc[code] = record;
-        return acc;
-      }, {});
+      const productMap = await this.productsService.getProductMapFromAirtable();
+      const consumableMap =
+        await this.consumablesService.getConsumableProductMapFromAirtable();
 
       const orderRecord = await DB().OrderTable.create({
         'ID пользователя': order.userId,
@@ -84,24 +80,35 @@ export class AppService {
 
           return acc;
         },
-        [[]],
+        [[] as OrderItemDto[]],
       );
 
       // Create order items in Airtable
 
       for (const orderItemsGroup of orderItemsGroups) {
         const orderItemsData = orderItemsGroup.map((item) => {
-          const productRecord = productMap[item.productCode];
-          const price =
-            productRecord.get(clientCategory) &&
-            productRecord.get(clientCategory)[0];
+          let productRecordId;
+          let price;
+
+          if (item.isConsumable) {
+            const consumableRecord = consumableMap[item.productCode];
+            productRecordId = consumableRecord.getId();
+            price = consumableRecord.get('Цена');
+          } else {
+            const productRecord = productMap[item.productCode];
+            productRecordId = productRecord.getId();
+            price =
+              productRecord.get(clientCategory) &&
+              productRecord.get(clientCategory)[0];
+          }
 
           return {
             fields: {
               Заказ: [orderRecord.getId()],
-              Товар: [productRecord.getId()],
+              Товар: [productRecordId],
               Количество: item.count,
               'Цена на момент заказа': price,
+              'Расходник?': item.isConsumable,
             },
           };
         });
@@ -122,15 +129,10 @@ export class AppService {
     const clientCategory = await this.clientCategoryService.getClientCategory(
       null,
     );
-    const cachedProducts = await this.productsService.getCachedProducts(
-      clientCategory,
-    );
-    const productMap = cachedProducts.reduce((acc, category) => {
-      category.instruments.forEach((product) => {
-        acc[product.code] = product;
-      });
-      return acc;
-    }, {});
+
+    const productMap = this.productsService.getCachedProductMap(clientCategory);
+    const consumablesMap =
+      this.consumablesService.getCachedConsumableProductMap();
 
     const orders = await DB()
       .OrderTable.select({
@@ -174,10 +176,17 @@ export class AppService {
         status: data['Статус'],
         createdAt: data['Дата создания'],
         products: (data['Коды товаров'] || []).map((item: string) => {
-          const product = productMap[item];
+          let product: Product | ConsumableProduct;
+
+          if (consumablesMap[item]) {
+            product = consumablesMap[item];
+          } else {
+            product = productMap[item];
+          }
 
           const count = orderProductsMap[item].count;
           const price = orderProductsMap[item].price;
+          const isConsumable = orderProductsMap[item].isConsumable;
 
           return {
             code: product.code,
@@ -185,6 +194,7 @@ export class AppService {
             thumbnail: product.thumbnail,
             price,
             count,
+            isConsumable,
           };
         }),
         totalPrice: data['Сумма заказа'],
@@ -202,7 +212,12 @@ export class AppService {
     const orderProductsData = await DB()
       .OrderItemsTable.select({
         view: 'База данных',
-        fields: ['Код товара', 'Количество', 'Цена на момент заказа'],
+        fields: [
+          'Код товара',
+          'Количество',
+          'Цена на момент заказа',
+          'Расходник?',
+        ],
         filterByFormula: `{ID заказа} = "${orderId}"`,
       })
       .all();
@@ -211,10 +226,13 @@ export class AppService {
       const productCode = item.get('Код товара') as string;
       const count = item.get('Количество') as number;
       const price = item.get('Цена на момент заказа') as number;
+      const isConsumable = item.get('Расходник?') as boolean;
+
       return {
         productCode,
         count,
         price,
+        isConsumable,
       };
     });
   }

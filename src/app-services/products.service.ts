@@ -2,14 +2,94 @@ import { Injectable } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { DB } from 'src/data/airtable-db';
 import { FirebaseDB } from 'src/data/firebase-db';
-import { ConsumableProduct } from 'src/models/consumable-product';
-import { ConsumableProductCategory } from 'src/models/consumable-product-category';
 import { Product } from 'src/models/product';
 import { ProductCategory } from 'src/models/product-category';
 
+/**
+ * Сервис для работы с товарами
+ *
+ * Airtable - база данных с товарами
+ * Firebase - кэш товаров
+ */
+
 @Injectable()
 export class ProductsService {
-  async getProducts() {
+  @Cron('0 */1 * * * *')
+  async updateProductsCache() {
+    const products = await this.getProductsFromAirtable();
+    await FirebaseDB().products.set(products);
+    console.log('Products cache updated');
+    return products;
+  }
+
+  async getCachedProducts(clientCategory: string): Promise<ProductCategory[]> {
+    let products: ProductCategory[] = [];
+
+    const cachedProductsSnaphot = await FirebaseDB().products.get();
+    products = cachedProductsSnaphot.val();
+
+    if (!products) {
+      products = await this.updateProductsCache();
+    }
+
+    const priceField =
+      {
+        к: 'kPrice',
+        кб: 'kbPrice',
+        о: 'oPrice',
+        н: 'nPrice',
+        ррц: 'rrcPrice',
+      }[clientCategory] || 'rrcPrice';
+
+    products.forEach((category) => {
+      category.instruments.forEach((instrument) => {
+        instrument.price = instrument[priceField];
+        delete instrument.kbPrice;
+        delete instrument.kPrice;
+        delete instrument.oPrice;
+        delete instrument.nPrice;
+        delete instrument.rrcPrice;
+      });
+    });
+
+    for (const category of products) {
+      category.instruments = category.instruments.filter(
+        (instrument) => instrument.price,
+      );
+    }
+
+    return products;
+  }
+
+  async getCachedProductMap(clientCategory: string) {
+    const cachedProducts = await this.getCachedProducts(clientCategory);
+    const productMap = cachedProducts.reduce((acc, category) => {
+      category.instruments.forEach((product) => {
+        acc[product.code] = product;
+      });
+      return acc;
+    }, {});
+
+    return productMap;
+  }
+
+  async getProductMapFromAirtable() {
+    const productsRecords = await DB()
+      .ProductTable.select({
+        view: 'Site',
+      })
+      .all();
+
+    const productMap = productsRecords.reduce((acc, record) => {
+      const code = record.get('Код') as string;
+      acc[code] = record;
+      return acc;
+    }, {});
+
+    return productMap;
+  }
+
+  private async getProductsFromAirtable() {
     const instruments = await DB()
       .ProductTable.select({
         view: 'Site',
@@ -101,52 +181,5 @@ export class ProductsService {
     });
 
     return groupedInstruments;
-  }
-
-  @Cron('0 */1 * * * *')
-  async updateProductsCache() {
-    const products = await this.getProducts();
-    await FirebaseDB().products.set(products);
-    console.log('Products cache updated');
-    return products;
-  }
-
-  async getCachedProducts(clientCategory: string): Promise<ProductCategory[]> {
-    let products: ProductCategory[] = [];
-
-    const cachedProductsSnaphot = await FirebaseDB().products.get();
-    products = cachedProductsSnaphot.val();
-
-    if (!products) {
-      products = await this.updateProductsCache();
-    }
-
-    const priceField =
-      {
-        к: 'kPrice',
-        кб: 'kbPrice',
-        о: 'oPrice',
-        н: 'nPrice',
-        ррц: 'rrcPrice',
-      }[clientCategory] || 'rrcPrice';
-
-    products.forEach((category) => {
-      category.instruments.forEach((instrument) => {
-        instrument.price = instrument[priceField];
-        delete instrument.kbPrice;
-        delete instrument.kPrice;
-        delete instrument.oPrice;
-        delete instrument.nPrice;
-        delete instrument.rrcPrice;
-      });
-    });
-
-    for (const category of products) {
-      category.instruments = category.instruments.filter(
-        (instrument) => instrument.price,
-      );
-    }
-
-    return products;
   }
 }
