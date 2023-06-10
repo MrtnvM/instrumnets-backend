@@ -4,7 +4,10 @@ import { OrderDto } from './models/order.dto';
 import { DB } from './data/airtable-db';
 import { OrderProductData } from './models/order-product-data';
 import { ConsumablesService } from './app-services/consumables.service';
-import { ProductsService } from './app-services/products.service';
+import {
+  RawProductMap,
+  ProductsService,
+} from './app-services/products.service';
 import { ClientCategoryService } from './app-services/client-category.service';
 import { OderItemDto as OrderItemDto } from './models/order-item.dto';
 import { ConsumableProduct } from './models/consumable-product';
@@ -86,34 +89,27 @@ export class AppService {
       // Create order items in Airtable
 
       for (const orderItemsGroup of orderItemsGroups) {
-        const orderItemsData = orderItemsGroup.map((item) => {
-          let productRecordId;
-          let price;
+        const productOrderItems = orderItemsGroup.filter(
+          (item) => !item.isConsumable,
+        );
 
-          if (item.isConsumable) {
-            const consumableRecord = consumableMap[item.productCode];
-            productRecordId = consumableRecord.getId();
-            price = consumableRecord.get('Цена');
-          } else {
-            const productRecord = productMap[item.productCode];
-            productRecordId = productRecord.getId();
-            price =
-              productRecord.get(clientCategory) &&
-              productRecord.get(clientCategory)[0];
-          }
+        const consumableOrderItems = orderItemsGroup.filter(
+          (item) => item.isConsumable,
+        );
 
-          return {
-            fields: {
-              Заказ: [orderRecord.getId()],
-              Товар: [productRecordId],
-              Количество: item.count,
-              'Цена на момент заказа': price,
-              'Расходник?': item.isConsumable,
-            },
-          };
-        });
-
-        await DB().OrderItemsTable.create(orderItemsData);
+        await Promise.all([
+          this.createProductOrderItems(
+            productOrderItems,
+            productMap,
+            orderRecord.getId(),
+            clientCategory,
+          ),
+          this.createConsumableProductOrderItems(
+            consumableOrderItems,
+            consumableMap,
+            orderRecord.getId(),
+          ),
+        ]);
       }
 
       return { success: true };
@@ -123,6 +119,63 @@ export class AppService {
         message: 'Ошибка создания заказа',
       });
     }
+  }
+
+  async createProductOrderItems(
+    orderItemsGroup: OrderItemDto[],
+    productMap: RawProductMap,
+    orderRecordId: string,
+    clientCategory: string,
+  ) {
+    if (orderItemsGroup.length === 0) {
+      return;
+    }
+
+    const productOrderItemsData = orderItemsGroup.map((item) => {
+      const productRecord = productMap[item.productCode];
+      const productRecordId = productRecord.getId();
+      const price =
+        productRecord.get(clientCategory) &&
+        productRecord.get(clientCategory)[0];
+
+      return {
+        fields: {
+          Заказ: [orderRecordId],
+          Товар: [productRecordId],
+          Количество: item.count,
+          'Цена на момент заказа': price,
+        },
+      };
+    });
+
+    await DB().OrderItemsTable.create(productOrderItemsData);
+  }
+
+  async createConsumableProductOrderItems(
+    orderItemsGroup: OrderItemDto[],
+    consumableMap: RawProductMap,
+    orderRecordId: string,
+  ) {
+    if (orderItemsGroup.length === 0) {
+      return;
+    }
+
+    const productOrderItemsData = orderItemsGroup.map((item) => {
+      const consumableRecord = consumableMap[item.productCode];
+      const consumableProductRecordId = consumableRecord.getId();
+      const price = consumableRecord.get('Цена');
+
+      return {
+        fields: {
+          Заказ: [orderRecordId],
+          Расходка: [consumableProductRecordId],
+          Количество: item.count,
+          'Цена на момент заказа': price,
+        },
+      };
+    });
+
+    await DB().ConsumableOrderItemsTable.create(productOrderItemsData);
   }
 
   async getOrders(userId: string) {
@@ -148,8 +201,10 @@ export class AppService {
           'Дата создания',
           'Статус',
           'Коды товаров',
+          'Артикулы расходки',
           'Сумма заказа',
           'Товар в заказе',
+          'Расходка в заказе',
         ],
       })
       .all();

@@ -1,9 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { Record, FieldSet } from 'airtable';
 import { DB } from 'src/data/airtable-db';
 import { FirebaseDB } from 'src/data/firebase-db';
 import { ConsumableProduct } from 'src/models/consumable-product';
 import { ConsumableProductCategory } from 'src/models/consumable-product-category';
+
+export type RawConsumableProductMap = { [key: string]: Record<FieldSet> };
 
 @Injectable()
 export class ConsumablesService {
@@ -84,9 +87,9 @@ export class ConsumablesService {
     return groupedConsumableProducts;
   }
 
-  async getConsumableProductMapFromAirtable() {
+  async getConsumableProductMapFromAirtable(): Promise<RawConsumableProductMap> {
     const consumableProductsRecords = await DB()
-      .ProductTable.select({
+      .ConsumablesTable.select({
         view: 'Grid view',
       })
       .all();
@@ -97,7 +100,7 @@ export class ConsumablesService {
         acc[code] = record;
         return acc;
       },
-      {},
+      {} as RawConsumableProductMap,
     );
 
     return consumablesProductMap;

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { Record, FieldSet } from 'airtable';
 import { DB } from 'src/data/airtable-db';
 import { FirebaseDB } from 'src/data/firebase-db';
 import { Product } from 'src/models/product';
@@ -11,6 +12,8 @@ import { ProductCategory } from 'src/models/product-category';
  * Airtable - база данных с товарами
  * Firebase - кэш товаров
  */
+
+export type RawProductMap = { [key: string]: Record<FieldSet> };
 
 @Injectable()
 export class ProductsService {
@@ -73,7 +76,7 @@ export class ProductsService {
     return productMap;
   }
 
-  async getProductMapFromAirtable() {
+  async getProductMapFromAirtable(): Promise<RawProductMap> {
     const productsRecords = await DB()
       .ProductTable.select({
         view: 'Site',
@@ -84,7 +87,7 @@ export class ProductsService {
       const code = record.get('Код') as string;
       acc[code] = record;
       return acc;
-    }, {});
+    }, {} as RawProductMap);
 
     return productMap;
   }
