@@ -103,6 +103,7 @@ export class AppService {
             consumableOrderItems,
             consumableMap,
             orderRecord.getId(),
+            clientCategory,
           ),
         ]);
       }
@@ -150,6 +151,7 @@ export class AppService {
     orderItemsGroup: OrderItemDto[],
     consumableMap: RawProductMap,
     orderRecordId: string,
+    clientCategory: string,
   ) {
     if (orderItemsGroup.length === 0) {
       return;
@@ -158,7 +160,9 @@ export class AppService {
     const productOrderItemsData = orderItemsGroup.map((item) => {
       const consumableRecord = consumableMap[item.productCode];
       const consumableProductRecordId = consumableRecord.getId();
-      const price = consumableRecord.get('Цена');
+      const price =
+        consumableRecord.get(clientCategory) &&
+        consumableRecord.get(clientCategory)[0];
 
       return {
         fields: {
