@@ -11,7 +11,7 @@ import { AppService } from './app.service';
 import { OrderDto } from './models/order.dto';
 import { FirebaseAuthGuard } from './core/providers/firebase-auth.guard';
 import { FirebaseUserRequest } from './core/providers/firebase-user.request';
-import { ProductsService } from './app-services/products.service';
+import { ProductsService } from './data/products.service';
 
 @Controller()
 export class AppController {

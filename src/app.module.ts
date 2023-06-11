@@ -6,9 +6,8 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { AdminModule } from './admin/admin.module';
 import { ApiKeyGuard } from './core/guards/api-key.guard';
 import { CategoriesModule } from './categories/categories.module';
-import { ConsumablesService } from './app-services/consumables.service';
-import { ProductsService } from './app-services/products.service';
-import { ClientCategoryService } from './app-services/client-category.service';
+import { TelegramModule } from './telegram/telegram.module';
+import { DataModule } from './data/data.module';
 
 @Module({
   imports: [
@@ -18,14 +17,10 @@ import { ClientCategoryService } from './app-services/client-category.service';
     ScheduleModule.forRoot(),
     AdminModule,
     CategoriesModule,
+    TelegramModule,
+    DataModule,
   ],
   controllers: [AppController],
-  providers: [
-    AppService,
-    ApiKeyGuard,
-    ConsumablesService,
-    ProductsService,
-    ClientCategoryService,
-  ],
+  providers: [AppService, ApiKeyGuard],
 })
 export class AppModule {}

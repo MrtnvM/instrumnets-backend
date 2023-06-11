@@ -5,6 +5,11 @@ export type ConsumableProduct = {
   images: string[];
   thumbnail: string;
   unit: string;
-  price: number;
   count: number;
+  kPrice?: number;
+  kbPrice?: number;
+  oPrice?: number;
+  nPrice?: number;
+  rrcPrice?: number;
+  price?: number;
 };

@@ -3,15 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import { OrderDto } from './models/order.dto';
 import { DB } from './data/airtable-db';
 import { OrderProductData } from './models/order-product-data';
-import { ConsumablesService } from './app-services/consumables.service';
-import {
-  RawProductMap,
-  ProductsService,
-} from './app-services/products.service';
-import { ClientCategoryService } from './app-services/client-category.service';
+import { ClientCategoryService } from './data/client-category.service';
 import { OderItemDto as OrderItemDto } from './models/order-item.dto';
-import { ConsumableProduct } from './models/consumable-product';
-import { Product } from './models/product';
+import { ConsumablesService } from './data/consumables.service';
+import { ProductsService, RawProductMap } from './data/products.service';
 
 @Injectable()
 export class AppService {
@@ -30,7 +25,7 @@ export class AppService {
       clientCategory,
     );
     const getCachedConsumables =
-      await this.consumablesService.getCachedConsumables();
+      await this.consumablesService.getCachedConsumables(clientCategory);
 
     return {
       products: cachedProducts,
@@ -185,7 +180,7 @@ export class AppService {
 
     const [productMap, consumablesMap] = await Promise.all([
       this.productsService.getCachedProductMap(clientCategory),
-      this.consumablesService.getCachedConsumableProductMap(),
+      this.consumablesService.getCachedConsumableProductMap(clientCategory),
     ]);
 
     const orders = await DB()

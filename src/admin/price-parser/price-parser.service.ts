@@ -3,40 +3,44 @@ import * as XLSX from 'xlsx';
 import { ProductInfo } from './models/priduct-info';
 import { splitToAirtableChunks } from 'src/utils/groups';
 import { DB } from 'src/data/airtable-db';
+import { ProductsService } from 'src/data/products.service';
+import { ConsumablesService } from 'src/data/consumables.service';
 
 @Injectable()
 export class PriceParserService {
   private readonly logger = new Logger(PriceParserService.name);
 
+  constructor(
+    private productsService: ProductsService,
+    private consumablesService: ConsumablesService,
+  ) {}
+
   async updatePrices(file: Buffer): Promise<ProductInfo[]> {
-    const parsedProducts = await this.parseXlsx(file);
+    const parsedProducts = await this.parseXlsx2(file);
     await this.updatePricesInDb(parsedProducts);
     return parsedProducts;
   }
 
-  async updatePricesInDb(productsInfo: ProductInfo[]) {
+  private async updatePricesInDb(productsInfo: ProductInfo[]) {
     this.logger.log('Updating prices in db...');
 
-    const productsRecords = await DB()
-      .ProductTable.select({
-        view: 'Site',
-      })
-      .all();
+    const [productMap, consumableMap] = await Promise.all([
+      this.productsService.getProductMapFromAirtable(),
+      this.consumablesService.getConsumableProductMapFromAirtable(),
+    ]);
 
-    const productMap = productsRecords.reduce((acc, record) => {
-      const code = record.get('Код') as string;
-      acc[code] = record;
-      return acc;
-    }, {});
+    this.logger.log('Loaded products and consumables from db');
 
-    const productInfoRecords = await DB()
+    const priceAndStocksRecords = await DB()
       .PricesAndStockTable.select({
         view: 'База данных',
       })
       .all();
 
+    this.logger.log('Loaded prices and stocks from db');
+
     const productInfoRecordsIds: Record<string, string> =
-      productInfoRecords.reduce((acc, record) => {
+      priceAndStocksRecords.reduce((acc, record) => {
         const code = record.get('Код товара') as string;
         acc[code] = record.getId();
         return acc;
@@ -56,8 +60,6 @@ export class PriceParserService {
 
     const getFields = (item: ProductInfo, isCreateMode: boolean) => {
       const productInfoRecord = productsInfoMap[item.code];
-      const productRecordId = productMap[item.code]?.getId() as string;
-
       const defaultValue = isCreateMode ? 0 : null;
 
       const fields = {
@@ -68,8 +70,17 @@ export class PriceParserService {
         кб: productInfoRecord.kbPrice || defaultValue,
         ррц: productInfoRecord.rrcPrice || defaultValue,
         Количество: item.count || defaultValue,
-        Товар: productRecordId ? [productRecordId] : undefined,
       };
+
+      const productRecordId = productMap[item.code]?.getId() as string;
+      if (productRecordId) {
+        fields['Товар'] = [productRecordId];
+      }
+
+      const consumableRecordId = consumableMap[item.code]?.getId() as string;
+      if (consumableRecordId) {
+        fields['Расходка'] = [consumableRecordId];
+      }
 
       Object.keys(fields).forEach((key) => {
         if (fields[key] === null) {
@@ -94,6 +105,8 @@ export class PriceParserService {
 
       await DB().PricesAndStockTable.create(productInfoData);
     }
+
+    this.logger.log('Creating new prices in db completed.');
 
     const existingProductsInfo = productsInfo.filter(
       (item) => productInfoRecordsIds[item.code],
@@ -120,25 +133,7 @@ export class PriceParserService {
     this.logger.log('Updating prices in db completed.');
   }
 
-  async parseXlsx(file: Buffer): Promise<ProductInfo[]> {
-    this.logger.log('Parsing prices file...');
-    const workbook = XLSX.read(file.buffer, { type: 'buffer' });
-    const sheetName = workbook.SheetNames[0];
-    const sheet = this.fixWorksheetArticulColumn(workbook.Sheets[sheetName]);
-    const products = this.parseProductsInfo(sheet);
-    this.logger.log(
-      'Parsing prices file completed. Parsed products: ' + products.length,
-    );
-    return products;
-  }
-
-  async updatePrices2(file: Buffer): Promise<ProductInfo[]> {
-    const parsedProducts = await this.parseXlsx2(file);
-    await this.updatePricesInDb(parsedProducts);
-    return parsedProducts;
-  }
-
-  async parseXlsx2(file: Buffer): Promise<ProductInfo[]> {
+  private async parseXlsx2(file: Buffer): Promise<ProductInfo[]> {
     this.logger.log('Parsing prices file...');
     const workbook = XLSX.read(file.buffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
@@ -157,12 +152,22 @@ export class PriceParserService {
     const notParsedRows = [];
 
     for (const row of rows) {
+      const code = row['Код'] || row['Артикул'];
+      const kPrice = row['к'] || row['Прайс К (р.)'];
+      const kbPrice = row['кб'] || row['Прайс КБ (р.)'];
+      const oPrice = row['о'] || row['Прайс О (р.)'];
+      const nPrice = row['н'] || row['Прайс Н (р.)'];
+      const rrcPrice = row['РРЦ'] || row['ррц'] || row['Прайс РРЦ (р.)'];
+      const count = row['Количество'] || row['Кол-во'] || row['Кол-во'];
+
       const product: ProductInfo = {
-        code: row['Код'],
-        kbPrice: Math.ceil(row['к']),
-        oPrice: Math.ceil(row['кб']),
-        nPrice: Math.ceil(row['н']),
-        rrcPrice: Math.ceil(row['РРЦ']),
+        code,
+        kPrice: Math.ceil(kPrice),
+        kbPrice: Math.ceil(kbPrice),
+        oPrice: Math.ceil(oPrice),
+        nPrice: Math.ceil(nPrice),
+        rrcPrice: Math.ceil(rrcPrice),
+        count: Math.floor(count),
       };
 
       Object.keys(product).forEach((key) => {
@@ -181,51 +186,53 @@ export class PriceParserService {
     return products;
   }
 
-  private parseProductsInfo(sheet: XLSX.WorkSheet): any[] {
-    const rows = XLSX.utils.sheet_to_json(sheet, {});
-
-    const products = [];
-    const notParsedRows = [];
-
-    for (const row of rows) {
-      const product = {
-        code: row['Артикул'],
-        kbPrice: row['Прайс КБ (р.)'],
-        oPrice: row['Прайс О (р.)'],
-        nPrice: row['Прайс Н (р.)'],
-        kPrice: row['Прайс К (р.)'],
-        count: row['Кол-во'],
-      };
-
-      if (product.code) {
-        products.push(product);
-      } else {
-        notParsedRows.push(row);
-      }
-    }
-
-    return products;
-  }
-
   private fixWorksheetArticulColumn(worksheet: XLSX.WorkSheet) {
+    const articulCellValue = {
+      v: 'Артикул',
+      t: 's',
+    };
+
     if (worksheet['!merges']) {
-      worksheet['!merges'] = worksheet['!merges'].filter((range) => {
+      const isA1C1 = (range: XLSX.Range) => {
         // Check if the range corresponds to 'A1:C1'
-        const isUnmergedRange =
+        const isSearchedRange =
           range.s.c === 0 &&
           range.e.c === 2 && // Columns A-C (0-indexed)
           range.s.r === 0 &&
           range.e.r === 0; // Row 1 (0-indexed)
 
-        return !isUnmergedRange;
-      });
-    }
+        return isSearchedRange;
+      };
 
-    delete worksheet['A1'];
-    worksheet['C1'] = {
-      v: 'Артикул',
-      t: 's',
-    };
+      if (worksheet['!merges'].some(isA1C1)) {
+        worksheet['!merges'] = worksheet['!merges'].filter(
+          (range) => !isA1C1(range),
+        );
+
+        delete worksheet['A1'];
+        worksheet['C1'] = articulCellValue;
+      }
+
+      const isA1B1 = (range: XLSX.Range) => {
+        // Check if the range corresponds to 'A1:B1'
+        const isSearchedRange =
+          range.s.c === 0 &&
+          range.e.c === 1 && // Columns A-B (0-indexed)
+          range.s.r === 0 &&
+          range.e.r === 0; // Row 1 (0-indexed)
+
+        return isSearchedRange;
+      };
+
+      if (worksheet['!merges'].some(isA1B1)) {
+        worksheet['!merges'] = worksheet['!merges'].filter(
+          (range) => !isA1B1(range),
+        );
+
+        delete worksheet['A1'];
+        worksheet['B1'] = articulCellValue;
+      }
+    }
 
     return worksheet;
   }

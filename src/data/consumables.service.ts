@@ -11,7 +11,7 @@ export type ConsumableProductMap = { [key: string]: ConsumableProduct };
 
 @Injectable()
 export class ConsumablesService {
-  async getConsumables() {
+  async getConsumablesFromAirtable() {
     const consumables = await DB()
       .ConsumablesTable.select({
         view: 'Grid view',
@@ -22,7 +22,11 @@ export class ConsumablesService {
           'Наименование',
           'Товарная группа',
           'Количество',
-          'Цена',
+          'к',
+          'кб',
+          'о',
+          'н',
+          'ррц',
         ],
         filterByFormula: '{Отображать} = 1',
       })
@@ -51,8 +55,12 @@ export class ConsumablesService {
           images: images.map((image: any) => image.url),
           thumbnail,
           unit: data['Единица измерения'],
-          price: data['Цена'],
-          count: data['Количество'],
+          kbPrice: data['кб'] && data['кб'][0],
+          kPrice: data['к'] && data['к'][0],
+          oPrice: data['о'] && data['о'][0],
+          nPrice: data['н'] && data['н'][0],
+          rrcPrice: data['ррц'] && data['ррц'][0],
+          count: (data['Количество'] && data['Количество'][0]) || 0,
         };
 
         return product;
@@ -107,8 +115,10 @@ export class ConsumablesService {
     return consumablesProductMap;
   }
 
-  async getCachedConsumableProductMap(): Promise<ConsumableProductMap> {
-    const cachedProducts = await this.getCachedConsumables();
+  async getCachedConsumableProductMap(
+    clientCategory: string,
+  ): Promise<ConsumableProductMap> {
+    const cachedProducts = await this.getCachedConsumables(clientCategory);
     const productMap = cachedProducts.reduce((acc, category) => {
       category.consumables.forEach((product) => {
         acc[product.code] = product;
@@ -121,13 +131,15 @@ export class ConsumablesService {
 
   @Cron('0 */1 * * * *')
   async updateConsumablesCache() {
-    const products = await this.getConsumables();
+    const products = await this.getConsumablesFromAirtable();
     await FirebaseDB().consumables.set(products);
     console.log('Consumables cache updated');
     return products;
   }
 
-  async getCachedConsumables(): Promise<ConsumableProductCategory[]> {
+  async getCachedConsumables(
+    clientCategory: string,
+  ): Promise<ConsumableProductCategory[]> {
     let consumablesProducts: ConsumableProductCategory[] = [];
 
     const cachedConsumablesProductsSnaphot =
@@ -138,6 +150,26 @@ export class ConsumablesService {
     if (!consumablesProducts) {
       consumablesProducts = await this.updateConsumablesCache();
     }
+
+    const priceField =
+      {
+        к: 'kPrice',
+        кб: 'kbPrice',
+        о: 'oPrice',
+        н: 'nPrice',
+        ррц: 'rrcPrice',
+      }[clientCategory] || 'rrcPrice';
+
+    consumablesProducts.forEach((category) => {
+      category.consumables.forEach((product) => {
+        product.price = product[priceField];
+        delete product.kbPrice;
+        delete product.kPrice;
+        delete product.oPrice;
+        delete product.nPrice;
+        delete product.rrcPrice;
+      });
+    });
 
     for (const category of consumablesProducts) {
       category.consumables = category.consumables.filter(
