@@ -7,6 +7,7 @@ import { ConsumableProduct } from 'src/models/consumable-product';
 import { ConsumableProductCategory } from 'src/models/consumable-product-category';
 
 export type RawConsumableProductMap = { [key: string]: Record<FieldSet> };
+export type ConsumableProductMap = { [key: string]: ConsumableProduct };
 
 @Injectable()
 export class ConsumablesService {
@@ -106,7 +107,7 @@ export class ConsumablesService {
     return consumablesProductMap;
   }
 
-  async getCachedConsumableProductMap() {
+  async getCachedConsumableProductMap(): Promise<ConsumableProductMap> {
     const cachedProducts = await this.getCachedConsumables();
     const productMap = cachedProducts.reduce((acc, category) => {
       category.consumables.forEach((product) => {

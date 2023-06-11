@@ -14,6 +14,7 @@ import { ProductCategory } from 'src/models/product-category';
  */
 
 export type RawProductMap = { [key: string]: Record<FieldSet> };
+export type ProductMap = { [key: string]: Product };
 
 @Injectable()
 export class ProductsService {
@@ -64,7 +65,7 @@ export class ProductsService {
     return products;
   }
 
-  async getCachedProductMap(clientCategory: string) {
+  async getCachedProductMap(clientCategory: string): Promise<ProductMap> {
     const cachedProducts = await this.getCachedProducts(clientCategory);
     const productMap = cachedProducts.reduce((acc, category) => {
       category.instruments.forEach((product) => {

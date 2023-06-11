@@ -183,9 +183,10 @@ export class AppService {
       null,
     );
 
-    const productMap = this.productsService.getCachedProductMap(clientCategory);
-    const consumablesMap =
-      this.consumablesService.getCachedConsumableProductMap();
+    const [productMap, consumablesMap] = await Promise.all([
+      this.productsService.getCachedProductMap(clientCategory),
+      this.consumablesService.getCachedConsumableProductMap(),
+    ]);
 
     const orders = await DB()
       .OrderTable.select({
@@ -214,9 +215,19 @@ export class AppService {
       const orderID = data['ID'];
 
       const orderProductsData = await this.getOrderProductsData(orderID);
+      const orderConsumablesData = await this.getConsumableOrderProductsData(
+        orderID,
+      );
 
       const orderProductsMap: Record<string, OrderProductData> =
         orderProductsData.reduce((acc, record) => {
+          const productCode = record.productCode;
+          acc[productCode] = record;
+          return acc;
+        }, {});
+
+      const orderConsumablesMap: Record<string, OrderProductData> =
+        orderConsumablesData.reduce((acc, record) => {
           const productCode = record.productCode;
           acc[productCode] = record;
           return acc;
@@ -231,25 +242,29 @@ export class AppService {
         status: data['Статус'],
         createdAt: data['Дата создания'],
         products: (data['Коды товаров'] || []).map((item: string) => {
-          let product: Product | ConsumableProduct;
-
-          if (consumablesMap[item]) {
-            product = consumablesMap[item];
-          } else {
-            product = productMap[item];
-          }
-
-          const count = orderProductsMap[item].count;
-          const price = orderProductsMap[item].price;
-          const isConsumable = orderProductsMap[item].isConsumable;
+          const product = productMap[item];
+          const orderItem = orderProductsMap[item];
 
           return {
             code: product.code,
             name: product.name,
             thumbnail: product.thumbnail,
-            price,
-            count,
-            isConsumable,
+            price: orderItem.price,
+            count: orderItem.count,
+            isConsumable: orderItem.isConsumable,
+          };
+        }),
+        consumables: (data['Артикулы расходки'] || []).map((item: string) => {
+          const product = consumablesMap[item];
+          const orderItem = orderConsumablesMap[item];
+
+          return {
+            code: product.code,
+            name: product.name,
+            thumbnail: product.thumbnail,
+            price: orderItem.price,
+            count: orderItem.count,
+            isConsumable: orderItem.isConsumable,
           };
         }),
         totalPrice: data['Сумма заказа'],
@@ -267,12 +282,7 @@ export class AppService {
     const orderProductsData = await DB()
       .OrderItemsTable.select({
         view: 'База данных',
-        fields: [
-          'Код товара',
-          'Количество',
-          'Цена на момент заказа',
-          'Расходник?',
-        ],
+        fields: ['Код товара', 'Количество', 'Цена на момент заказа'],
         filterByFormula: `{ID заказа} = "${orderId}"`,
       })
       .all();
@@ -281,13 +291,37 @@ export class AppService {
       const productCode = item.get('Код товара') as string;
       const count = item.get('Количество') as number;
       const price = item.get('Цена на момент заказа') as number;
-      const isConsumable = item.get('Расходник?') as boolean;
 
       return {
         productCode,
         count,
         price,
-        isConsumable,
+        isConsumable: false,
+      };
+    });
+  }
+
+  private async getConsumableOrderProductsData(
+    orderId: string,
+  ): Promise<OrderProductData[]> {
+    const orderProductsData = await DB()
+      .ConsumableOrderItemsTable.select({
+        view: 'База данных',
+        fields: ['Артикул', 'Количество', 'Цена на момент заказа'],
+        filterByFormula: `{ID заказа} = "${orderId}"`,
+      })
+      .all();
+
+    return orderProductsData.map((item) => {
+      const productCode = item.get('Артикул') as string;
+      const count = item.get('Количество') as number;
+      const price = item.get('Цена на момент заказа') as number;
+
+      return {
+        productCode,
+        count,
+        price,
+        isConsumable: true,
       };
     });
   }
