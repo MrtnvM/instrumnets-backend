@@ -230,7 +230,7 @@ export class PriceParserService {
         );
 
         delete worksheet['A1'];
-        worksheet['B1'] = articulCellValue;
+        // worksheet['B1'] = articulCellValue;
       }
     }
 
