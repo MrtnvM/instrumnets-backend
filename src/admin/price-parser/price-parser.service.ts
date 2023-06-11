@@ -124,7 +124,7 @@ export class PriceParserService {
     this.logger.log('Parsing prices file...');
     const workbook = XLSX.read(file.buffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
+    const sheet = this.fixWorksheetArticulColumn(workbook.Sheets[sheetName]);
     const products = this.parseProductsInfo(sheet);
     this.logger.log(
       'Parsing prices file completed. Parsed products: ' + products.length,
@@ -142,7 +142,7 @@ export class PriceParserService {
     this.logger.log('Parsing prices file...');
     const workbook = XLSX.read(file.buffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
+    const sheet = this.fixWorksheetArticulColumn(workbook.Sheets[sheetName]);
     const products = this.parseProductsInfo2(sheet);
     this.logger.log(
       'Parsing prices file completed. Parsed products: ' + products.length,
@@ -205,5 +205,28 @@ export class PriceParserService {
     }
 
     return products;
+  }
+
+  private fixWorksheetArticulColumn(worksheet: XLSX.WorkSheet) {
+    if (worksheet['!merges']) {
+      worksheet['!merges'] = worksheet['!merges'].filter((range) => {
+        // Check if the range corresponds to 'A1:C1'
+        const isUnmergedRange =
+          range.s.c === 0 &&
+          range.e.c === 2 && // Columns A-C (0-indexed)
+          range.s.r === 0 &&
+          range.e.r === 0; // Row 1 (0-indexed)
+
+        return !isUnmergedRange;
+      });
+    }
+
+    delete worksheet['A1'];
+    worksheet['C1'] = {
+      v: 'Артикул',
+      t: 's',
+    };
+
+    return worksheet;
   }
 }
