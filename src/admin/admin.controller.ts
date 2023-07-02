@@ -42,6 +42,45 @@ export class AdminController {
     }
   }
 
+  async copyProductGroup() {
+    const newProducts = await DB()
+      .ConsumablesTempTable.select({
+        view: 'Grid view',
+      })
+      .all();
+
+    const newProductsMap = newProducts.reduce((acc, item) => {
+      const code = (item.get('Артикул') as string)?.trim()?.toUpperCase();
+      if (!code) return acc;
+
+      acc[code] = item;
+      return acc;
+    }, {});
+
+    const existingProducts = await DB()
+      .ConsumablesTable.select({
+        view: 'Grid view',
+      })
+      .all();
+
+    for (const existingProduct of existingProducts) {
+      const code = (existingProduct.get('Артикул') as string)
+        ?.trim()
+        ?.toUpperCase();
+
+      if (!code) continue;
+
+      const newProduct = newProductsMap[code];
+      if (!newProduct) continue;
+
+      const productGroup = newProduct.get('Группа товара');
+
+      await DB().ConsumablesTable.update(existingProduct.getId(), {
+        'Товарная группа v2': productGroup,
+      });
+    }
+  }
+
   async updateConsumablesListByXlsx(@UploadedFile() file: Express.Multer.File) {
     const workbook = XLSX.read(file.buffer, { type: 'buffer' });
     const worksheetName = workbook.SheetNames[0];

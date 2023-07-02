@@ -20,7 +20,7 @@ export class ConsumablesService {
           'Фото',
           'Единица измерения',
           'Наименование',
-          'Товарная группа',
+          'Товарная группа v2',
           'Количество',
           'к',
           'кб',
@@ -36,7 +36,7 @@ export class ConsumablesService {
       .map((productData: any) => {
         const data = productData.fields;
         const images = data['Фото'] || [];
-        const categories = data['Товарная группа'] || [];
+        const categories = data['Товарная группа v2'] || [];
 
         const thumbnail =
           images.length > 0 //
@@ -54,7 +54,7 @@ export class ConsumablesService {
               : null,
           images: images.map((image: any) => image.url),
           thumbnail,
-          unit: data['Единица измерения'],
+          unit: data['Единица измерения'] || '',
           kbPrice: data['кб'] && data['кб'][0],
           kPrice: data['к'] && data['к'][0],
           oPrice: data['о'] && data['о'][0],

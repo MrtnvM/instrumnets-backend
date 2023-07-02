@@ -16,10 +16,12 @@ export const DB = () => {
   const PricesAndStockTable = InstrumentsBase('Цены и остатки');
   const ClientCategoriesTable = InstrumentsBase('Категории клиентов');
   const ConsumablesTable = InstrumentsBase('Расходка');
+  const ConsumablesTempTable = InstrumentsBase('Расходка - temp');
 
   return {
     ProductTable,
     ConsumablesTable,
+    ConsumablesTempTable,
     CategoryTable,
     OrderTable,
     OrderItemsTable,
