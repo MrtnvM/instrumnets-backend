@@ -16,7 +16,7 @@ export class PriceParserService {
   ) {}
 
   async updatePrices(file: Buffer): Promise<ProductInfo[]> {
-    const parsedProducts = await this.parseXlsx2(file);
+    const parsedProducts = await this.parsePricesAndCounts(file);
     await this.updatePricesInDb(parsedProducts);
     return parsedProducts;
   }
@@ -54,8 +54,13 @@ export class PriceParserService {
       {},
     );
 
-    const newProductsInfo = productsInfo.filter(
-      (item) => !productInfoRecordsIds[item.code],
+    const newProductsInfo = Object.values(
+      productsInfo
+        .filter((item) => !productInfoRecordsIds[item.code])
+        .reduce((acc, item) => {
+          acc[item.code] = item;
+          return acc;
+        }, {} as Record<string, ProductInfo>),
     );
 
     const getFields = (item: ProductInfo, isCreateMode: boolean) => {
@@ -108,9 +113,15 @@ export class PriceParserService {
 
     this.logger.log('Creating new prices in db completed.');
 
-    const existingProductsInfo = productsInfo.filter(
-      (item) => productInfoRecordsIds[item.code],
+    const existingProductsInfo = Object.values(
+      productsInfo
+        .filter((item) => productInfoRecordsIds[item.code])
+        .reduce((acc, item) => {
+          acc[item.code] = item;
+          return acc;
+        }, {} as Record<string, ProductInfo>),
     );
+
     const existingProductsInfoChunks =
       splitToAirtableChunks(existingProductsInfo);
 
@@ -133,19 +144,21 @@ export class PriceParserService {
     this.logger.log('Updating prices in db completed.');
   }
 
-  private async parseXlsx2(file: Buffer): Promise<ProductInfo[]> {
+  /// PARSING PRICES AND COUNTS FROM XLSX FILE
+
+  private async parsePricesAndCounts(file: Buffer): Promise<ProductInfo[]> {
     this.logger.log('Parsing prices file...');
     const workbook = XLSX.read(file.buffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
     const sheet = this.fixWorksheetArticulColumn(workbook.Sheets[sheetName]);
-    const products = this.parseProductsInfo2(sheet);
+    const products = this.parseProductsInfo(sheet);
     this.logger.log(
       'Parsing prices file completed. Parsed products: ' + products.length,
     );
     return products;
   }
 
-  private parseProductsInfo2(sheet: XLSX.WorkSheet): ProductInfo[] {
+  private parseProductsInfo(sheet: XLSX.WorkSheet): ProductInfo[] {
     const rows = XLSX.utils.sheet_to_json(sheet, {});
 
     const products: ProductInfo[] = [];
@@ -158,7 +171,13 @@ export class PriceParserService {
       const oPrice = row['о'] || row['Прайс О (р.)'];
       const nPrice = row['н'] || row['Прайс Н (р.)'];
       const rrcPrice = row['РРЦ'] || row['ррц'] || row['Прайс РРЦ (р.)'];
-      const count = row['Количество'] || row['Кол-во'] || row['Кол-во'];
+
+      const count =
+        row['Количество'] ||
+        row['Кол-во'] ||
+        row['Кол-во'] ||
+        row['Остатки Казань'] ||
+        row['остатки Казань'];
 
       const product: ProductInfo = {
         code,
@@ -176,7 +195,7 @@ export class PriceParserService {
         }
       });
 
-      if (product.code) {
+      if (product.code && Object.keys(product).length > 1) {
         products.push(product);
       } else {
         notParsedRows.push(row);
@@ -185,6 +204,8 @@ export class PriceParserService {
 
     return products;
   }
+
+  /// FIXING XLSX FILE
 
   private fixWorksheetArticulColumn(worksheet: XLSX.WorkSheet) {
     const articulCellValue = {
