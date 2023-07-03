@@ -166,11 +166,12 @@ export class PriceParserService {
 
     for (const row of rows) {
       const code = row['Код'] || row['Артикул'];
-      const kPrice = row['к'] || row['Прайс К (р.)'];
-      const kbPrice = row['кб'] || row['Прайс КБ (р.)'];
-      const oPrice = row['о'] || row['Прайс О (р.)'];
-      const nPrice = row['н'] || row['Прайс Н (р.)'];
-      const rrcPrice = row['РРЦ'] || row['ррц'] || row['Прайс РРЦ (р.)'];
+      const kPrice = row['к'] || row['Прайс К (р.)'] || row['Прайс К'];
+      const kbPrice = row['кб'] || row['Прайс КБ (р.)'] || row['Прайс КБ'];
+      const oPrice = row['о'] || row['Прайс О (р.)'] || row['Прайс О'];
+      const nPrice = row['н'] || row['Прайс Н (р.)'] || row['Прайс Н'];
+      const rrcPrice =
+        row['РРЦ'] || row['ррц'] || row['Прайс РРЦ (р.)'] || row['Прайс РРЦ'];
 
       const count =
         row['Количество'] ||
@@ -179,14 +180,33 @@ export class PriceParserService {
         row['Остатки Казань'] ||
         row['остатки Казань'];
 
+      const parsePrice = (price: string | number) => {
+        if (typeof price === 'string') {
+          const priceValueString = price
+            .replace(/р\./, '')
+            .replace(/,/, '.')
+            .trim();
+
+          const priceValue = parseFloat(priceValueString);
+
+          if (isNaN(priceValue)) {
+            return NaN;
+          }
+
+          return Math.ceil(kPrice);
+        } else {
+          return price;
+        }
+      };
+
       const product: ProductInfo = {
         code,
-        kPrice: Math.ceil(kPrice),
-        kbPrice: Math.ceil(kbPrice),
-        oPrice: Math.ceil(oPrice),
-        nPrice: Math.ceil(nPrice),
-        rrcPrice: Math.ceil(rrcPrice),
-        count: Math.floor(count),
+        kPrice: parsePrice(kPrice),
+        kbPrice: parsePrice(kbPrice),
+        oPrice: parsePrice(oPrice),
+        nPrice: parsePrice(nPrice),
+        rrcPrice: parsePrice(rrcPrice),
+        count: parsePrice(count),
       };
 
       Object.keys(product).forEach((key) => {
