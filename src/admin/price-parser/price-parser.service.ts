@@ -193,7 +193,7 @@ export class PriceParserService {
             return NaN;
           }
 
-          return Math.ceil(kPrice);
+          return Math.ceil(priceValue);
         } else {
           return price;
         }
