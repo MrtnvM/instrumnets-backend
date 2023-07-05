@@ -241,6 +241,8 @@ export class AppService {
         status: data['Статус'],
         createdAt: data['Дата создания'],
         products: (data['Коды товаров'] || []).map((item: string) => {
+          console.log('Коды товара', item);
+
           const product = productMap[item];
           const orderItem = orderProductsMap[item];
 
