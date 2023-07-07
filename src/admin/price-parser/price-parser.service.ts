@@ -75,7 +75,7 @@ export class PriceParserService {
         кб: productInfoRecord.kbPrice || defaultValue,
         ррц: productInfoRecord.rrcPrice || defaultValue,
         Количество:
-          item.count !== undefined || item.count !== null
+          typeof productInfoRecord.count === 'number'
             ? item.count
             : defaultValue,
       };
