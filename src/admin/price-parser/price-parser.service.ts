@@ -74,7 +74,10 @@ export class PriceParserService {
         н: productInfoRecord.nPrice || defaultValue,
         кб: productInfoRecord.kbPrice || defaultValue,
         ррц: productInfoRecord.rrcPrice || defaultValue,
-        Количество: item.count || defaultValue,
+        Количество:
+          item.count !== undefined || item.count !== null
+            ? item.count
+            : defaultValue,
       };
 
       const productRecordId = productMap[item.code]?.getId() as string;
