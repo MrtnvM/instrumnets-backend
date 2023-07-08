@@ -37,6 +37,16 @@ export class ConsumablesService {
         const data = productData.fields;
         const images = data['Фото'] || [];
         const categories = data['Товарная группа'] || [];
+        let category =
+          typeof categories === 'string'
+            ? categories
+            : categories.length > 0
+            ? categories[0]
+            : null;
+
+        if (category) {
+          category = category.split('/')[0].trim();
+        }
 
         const thumbnail =
           images.length > 0 //
@@ -46,12 +56,7 @@ export class ConsumablesService {
         const product: ConsumableProduct = {
           code: data['Артикул'],
           name: data['Наименование'],
-          category:
-            typeof categories === 'string'
-              ? categories
-              : categories.length > 0
-              ? categories[0]
-              : null,
+          category,
           images: images.map((image: any) => image.url),
           thumbnail,
           unit: data['Единица измерения'] || '',
