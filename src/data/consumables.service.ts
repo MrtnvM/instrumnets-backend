@@ -20,7 +20,7 @@ export class ConsumablesService {
           'Фото',
           'Единица измерения',
           'Наименование',
-          'Товарная группа v2',
+          'Товарная группа',
           'Количество',
           'к',
           'кб',
@@ -36,7 +36,7 @@ export class ConsumablesService {
       .map((productData: any) => {
         const data = productData.fields;
         const images = data['Фото'] || [];
-        const categories = data['Товарная группа v2'] || [];
+        const categories = data['Товарная группа'] || [];
 
         const thumbnail =
           images.length > 0 //

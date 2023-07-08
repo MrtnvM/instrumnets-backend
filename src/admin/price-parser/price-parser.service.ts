@@ -176,12 +176,17 @@ export class PriceParserService {
       const rrcPrice =
         row['РРЦ'] || row['ррц'] || row['Прайс РРЦ (р.)'] || row['Прайс РРЦ'];
 
-      const count =
-        row['Количество'] ||
-        row['Кол-во'] ||
-        row['Кол-во'] ||
-        row['Остатки Казань'] ||
-        row['остатки Казань'];
+      let count = undefined;
+
+      if (typeof row['Количество'] === 'number') {
+        count = row['Количество'];
+      } else if (typeof row['Кол-во'] === 'number') {
+        count = row['Кол-во'];
+      } else if (typeof row['Остатки Казань'] === 'number') {
+        count = row['Остатки Казань'];
+      } else if (typeof row['остатки Казань'] === 'number') {
+        count = row['остатки Казань'];
+      }
 
       const parsePrice = (price: string | number) => {
         if (typeof price === 'string') {
