@@ -37,15 +37,26 @@ export class ConsumablesService {
         const data = productData.fields;
         const images = data['Фото'] || [];
         const categories = data['Товарная группа'] || [];
-        let category =
+        const originCategory =
           typeof categories === 'string'
             ? categories
             : categories.length > 0
             ? categories[0]
             : null;
 
-        if (category) {
+        let category = originCategory;
+        if (originCategory) {
           category = category.split('/')[0].trim();
+        }
+
+        let detailedCategory = null;
+        if (originCategory && category) {
+          detailedCategory = originCategory
+            .replace(category, '')
+            .split('/')
+            .map((item) => item.trim())
+            .filter((item) => item)
+            .join(' / ');
         }
 
         const thumbnail =
@@ -57,6 +68,7 @@ export class ConsumablesService {
           code: data['Артикул'],
           name: data['Наименование'],
           category,
+          detailedCategory,
           images: images.map((image: any) => image.url),
           thumbnail,
           unit: data['Единица измерения'] || '',
@@ -97,6 +109,15 @@ export class ConsumablesService {
       group.consumables.push(instrument);
       return acc;
     }, []);
+
+    for (const group of groupedConsumableProducts) {
+      group.consumables.sort((a, b) => {
+        const aDetailedCategory = a.detailedCategory || '';
+        const bDetailedCategory = b.detailedCategory || '';
+
+        return aDetailedCategory.localeCompare(bDetailedCategory);
+      });
+    }
 
     return groupedConsumableProducts;
   }

@@ -2,6 +2,7 @@ export type ConsumableProduct = {
   code: string;
   name: string;
   category: string;
+  detailedCategory: string | null;
   images: string[];
   thumbnail: string;
   unit: string;
