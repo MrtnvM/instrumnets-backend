@@ -28,7 +28,6 @@ export class ConsumablesService {
           'н',
           'ррц',
         ],
-        filterByFormula: '{Отображать} = 1',
       })
       .all();
 
@@ -82,10 +81,7 @@ export class ConsumablesService {
 
         return product;
       })
-      .filter(
-        (instrument) =>
-          instrument.name && instrument.thumbnail && instrument.count > 0,
-      );
+      .filter((instrument) => instrument.name && instrument.count > 0);
 
     const groupedConsumableProducts = productsData.reduce<
       {

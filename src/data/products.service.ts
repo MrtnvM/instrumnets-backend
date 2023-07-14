@@ -112,7 +112,6 @@ export class ProductsService {
           'н',
           'ррц',
         ],
-        filterByFormula: '{Отображается} = 1',
       })
       .all();
 
@@ -150,10 +149,7 @@ export class ProductsService {
 
         return product;
       })
-      .filter(
-        (instrument) =>
-          instrument.name && instrument.thumbnail && instrument.count > 0,
-      );
+      .filter((instrument) => instrument.name && instrument.count > 0);
 
     const groupedInstruments = instrumentsData.reduce<
       {
